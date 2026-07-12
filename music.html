@@ -53,40 +53,56 @@
 
         async function uploadFile() {
             const fileInput = document.getElementById('fileInput');
+            const loading = document.getElementById('loading');
+            const resultBox = document.getElementById('resultBox');
+            const directLinkInput = document.getElementById('directLink');
+
             if (fileInput.files.length === 0) return alert('Please select an audio file!');
             
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('resultBox').style.display = 'none';
+            loading.style.display = 'block';
+            resultBox.style.display = 'none';
 
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            reader.readAsDataURL(file);
-            reader.onload = async () => {
-                const base64Data = reader.result.split(',')[1];
-                const filename = `audio_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+            try {
+                // Step 1: Fetch the best available Gofile server
+                const serverRes = await fetch('https://api.gofile.io/contents/upload/server');
+                if (!serverRes.ok) throw new Error('Server is busy. Please try again later.');
+                
+                const serverData = await serverRes.json();
+                const serverName = serverData.data.server;
 
-                try {
-                    const response = await fetch('/.netlify/functions/upload', {
-                        method: 'POST',
-                        body: JSON.stringify({ filename, image: base64Data }),
-                        headers: { 'Content-Type': 'application/json' }
-                    });
-                    const data = await response.json();
-                    if (response.ok && data.path) {
-                        document.getElementById('directLink').value = `${window.location.origin}/${data.path}`;
-                        document.getElementById('resultBox').style.display = 'block';
-                    }
-                } catch (e) {
-                    alert('Error uploading file!');
-                } finally {
-                    document.getElementById('loading').style.display = 'none';
+                // Step 2: Prepare the audio file for upload
+                const file = fileInput.files[0];
+                const formData = new FormData();
+                formData.append('file', file);
+
+                // Step 3: Upload directly to Gofile server
+                const uploadRes = await fetch(`https://${serverName}.gofile.io/contents/upload/file`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await uploadRes.json();
+
+                // Step 4: Display the download link if successful
+                if (result.status === 'ok') {
+                    directLinkInput.value = result.data.downloadPage;
+                    resultBox.style.display = 'block';
+                } else {
+                    alert('Upload failed! Server did not respond properly.');
                 }
-            };
+
+            } catch (error) {
+                console.error(error);
+                alert('Error: ' + error.message);
+            } finally {
+                loading.style.display = 'none';
+            }
         }
 
         function copyLink() {
             const linkInput = document.getElementById('directLink');
             linkInput.select();
+            linkInput.setSelectionRange(0, 99999); // Mobile compatibility
             navigator.clipboard.writeText(linkInput.value);
             alert('Copied to clipboard! ✅');
         }
