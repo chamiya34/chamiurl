@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload Image</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <nav class="navbar">
+        <a href="index.html" class="nav-brand">DevUpload</a>
+        <div class="nav-links">
+            <a href="img.html" style="color: #00ffcc;">Images</a>
+            <a href="music.html">Music</a>
+            <a href="gif.html">GIFs</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="glass-box">
+            <h2>📸 Upload Image</h2>
+            <div class="drop-zone" onclick="document.getElementById('fileInput').click();">
+                <p>Click here to select an Image (JPG, PNG)</p>
+                <input type="file" id="fileInput" accept="image/jpeg, image/png, image/webp" style="display: none;" onchange="previewFile(event)">
+                <img id="preview" src="#" alt="Preview">
+            </div>
+
+            <button class="btn-3d" onclick="uploadFile()">Upload & Generate Link</button>
+            <div id="loading" style="display: none; margin-top: 15px; font-weight: bold; color: #00ffcc;">Uploading... Please wait ⚡</div>
+
+            <div id="resultBox" class="result-box">
+                <strong>Your Direct Link:</strong>
+                <input type="text" id="directLink" class="input-link" readonly>
+                <button class="btn-3d copy-btn" onclick="copyLink()">📋 Copy Link</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function previewFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const preview = document.getElementById('preview');
+            const reader = new FileReader();
+            reader.onload = function() {
+                preview.src = reader.result;
+                preview.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (fileInput.files.length === 0) return alert('Please select an image!');
+            
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('resultBox').style.display = 'none';
+
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+                const base64Data = reader.result.split(',')[1];
+                const filename = `img_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+
+                try {
+                    const response = await fetch('/.netlify/functions/upload', {
+                        method: 'POST',
+                        body: JSON.stringify({ filename, image: base64Data }),
+                        headers: { 'Content-Type': 'application/json' }
+                    });
+                    const data = await response.json();
+                    if (response.ok && data.path) {
+                        document.getElementById('directLink').value = `${window.location.origin}/${data.path}`;
+                        document.getElementById('resultBox').style.display = 'block';
+                    } else {
+                        alert('Upload failed!');
+                    }
+                } catch (e) {
+                    alert('Error uploading file!');
+                } finally {
+                    document.getElementById('loading').style.display = 'none';
+                }
+            };
+        }
+
+        function copyLink() {
+            const linkInput = document.getElementById('directLink');
+            linkInput.select();
+            navigator.clipboard.writeText(linkInput.value);
+            alert('Copied to clipboard! ✅');
+        }
+    </script>
+</body>
+</html>
